@@ -1,0 +1,346 @@
+\documentclass{article}
+\usepackage{fullpage}
+\usepackage{algorithmic}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage{color}
+
+\providecommand{\e}[1]{\ensuremath{\times 10^{#1}}}
+
+\begin{document}
+
+\title{Band Cholesky Method implementation}
+\date{April 18, 2011}
+\author{Bysiek Mateusz, Witan Maciej (Computer Science A/R)}
+\maketitle
+
+\section{Task}
+
+Design a MATLAB function that will solve a system of equations $Ax=B$ using the
+band Cholesky method.
+
+For each computed solution $\tilde{x}$ of the system $Ax=b$, form the relative
+residual error:
+\[ \frac{ \|b-A\tilde{x}\|_2 }{ \|A\|_F \|\tilde{x}\|_2 } \]
+
+\section{Introdution to the method}
+
+We have decided to design a modular function ``Band Cholesky Solver'', or $BCS$,
+which will solve the problem iteratively, step by step. Divide and conquer
+method allowed us to tackle the problem as a team, because on one hand both
+team members had their own part of the work to do, but on the other hand we
+then put the algorithms together, and synchronized them. The result is presented
+below.
+
+For this method, the input matrix $A$ must be symmetric positive definite, $A
+\in \mathbb{R}^{n \times n}$. It also must be banded, with bandwith $w$. Matrix
+$B$ should be of size $n \times m$.
+
+\subsection{Fragmentation of the problem}
+
+At first, the problem was $Ax = B$, where $B \in \mathbb{R}^{n \times m}$ had
+$m$ columns: $b_1 \ldots b_m$. The problem was splitted to $m$ smaller
+subproblems, such that: \[ \forall i \in \{1 \ldots m\} : Ax_i = b_i \]
+
+Then, we did the following four steps for each column $b_i$, and received $m$
+partial solutions.
+
+\subsection{Cholesky decomposition}
+
+Symmetric positive definite matrix $A \in \mathbb{R}^{n \times n}$, with bandwith $w$ is
+given to the following algorithm.
+
+\begin{algorithmic}
+\STATE $L=A$
+\FOR{$j = 1:n$}
+	\FOR{$k = max(1,j-w):j-1$}
+		\STATE $\lambda = min(k+w,n)$
+		\STATE $L(j:\lambda,j) = L(j:\lambda,j) - L(j,k) L(j:\lambda,k)$
+	\ENDFOR
+	\STATE $\lambda = min(j+w,n)$
+	\STATE $L(j:\lambda,j) = L(j:\lambda,j) / \sqrt{A(j,j)}$
+\ENDFOR
+\STATE $L = L - triu(L, 1)$
+\end{algorithmic}
+
+This algorithm ends with creation of matrix $L$, such that $A = LL^T$.
+Initially, $L = A$, but L is overwritten step by step with correct values in the
+lower-triangular area. After that, values over the diagonal are cleared.
+
+\subsection{Solution of the preliminary system of equations}
+
+Banded, lower triangular matrix $L \in \mathbb{R}^{n \times n}$ with bandwidth $w$ is
+given to the algorithm below. Also, vector $b$ of length $n$ is given. 
+
+\begin{algorithmic}
+\STATE $y = b$
+\FOR{$j = 1:n$}
+	\FOR{$i = max(j, j-w):j-1$}
+		\STATE $y(j) = y(j) - L(j,i) y(i)$
+	\ENDFOR
+	\STATE $y(j) = y(j)/L(j,j)$
+\ENDFOR
+\end{algorithmic}
+
+Resulting vector $y \in \mathbb{R}^{n \times 1}$ is an intermediate solution
+that is used in final calculations.
+
+\subsection{Calculation of the final result}
+
+The intermediate solution $y$ and upper-triangular matrix $U = L^T$ with
+bandwith $w$ is given as the input.
+
+\begin{algorithmic}
+\STATE $x=y$
+\FOR{$j = n:-1:1$}
+	\STATE $x(j) = x(j)/U(j,j)$
+	\FOR{$i = max(1,j-w):j-1$}
+		\STATE $x(i) = x(i) - U(i,j) x(j)$
+	\ENDFOR
+\ENDFOR
+\end{algorithmic}
+
+\subsection{Calculating the error}
+
+For every result, error $e$ is equal to $\|b-A\tilde{x}\|_2 /( \|A\|_F
+\|\tilde{x}\|_2 )$.
+
+\begin{algorithmic}
+\STATE $e = norm(b-Ax,2) / (norm(A,"fro") norm(x,2))$
+\end{algorithmic}
+
+\section{Implementation}
+
+The above-mentioned algorithms were implemented as separate functions.
+
+\begin{enumerate}
+	\item To split problem into smaller, we simply used $for$ loop.
+	\item Cholesky decomposition: $cholband.m$
+	\item Solution of the preliminary system of equations: $lsolve.m$
+	\item Calculation of the final result: $usolve.m$
+	\item Error estimation: $residerr.m$
+\end{enumerate}
+
+An aggregate function $BCS$ is used to launch those operations in sequence, as
+well as to calculate residual error.
+
+We also have constructed the following support files
+\begin{itemize}
+	\item solver that uses built-in functions, for comparison: $STS.m$
+	\item menu to make using using our solution easier: $BCS\_menu.m$
+	\item examples: $ex1.m$ $ex2.m$ $ex3.m$ 
+\end{itemize}
+
+\subsection{Examples}
+
+For better presentation of how our solution works, we have included 3 examples
+in our project.
+
+\subsubsection{First example}
+
+A is based on matrix of ones in the following way:
+
+\begin{algorithmic}
+\STATE $A = ones(8)$
+\STATE $A = A-tril(A,-2)-triu(A,2)$
+\STATE $A = A*A$
+\STATE $A = A+eye(8)$
+\end{algorithmic}
+
+Vector b is obtained by $A \times ones(8, 1)$, and solving for $x$ using Band
+Cholesky Solver gives exacly that vector.
+
+\[ A = \left[
+\begin{array}{cccccccc}
+3 & 2 & 1 & 0 & 0 & 0 & 0 & 0 \\
+2 & 4 & 2 & 1 & 0 & 0 & 0 & 0 \\
+1 & 2 & 4 & 2 & 1 & 0 & 0 & 0 \\
+0 & 1 & 2 & 4 & 2 & 1 & 0 & 0 \\
+0 & 0 & 1 & 2 & 4 & 2 & 1 & 0 \\
+0 & 0 & 0 & 1 & 2 & 4 & 2 & 1 \\
+0 & 0 & 0 & 0 & 1 & 2 & 4 & 2 \\
+0 & 0 & 0 & 0 & 0 & 1 & 2 & 3 \\
+\end{array} \right], 
+b = \left( \begin{array}{c} 
+6 \\ 9 \\ 10 \\ 10 \\ 10 \\ 10 \\ 9 \\ 6
+\end{array} \right), 
+x = \left( \begin{array}{c} 
+1\\ 1\\ 1\\ 1\\ 1\\ 1\\ 1\\ 1
+\end{array} \right)
+\]
+
+Becasuse the relative error is very small, i.e $e =  6.8776\e{-16}$ indicating
+that some deviations in results can appear not closer than at $16^{th}$ decimal
+place this is thanks to the matrix A being well-conditioned as condtion number 
+of matrix A is very close to the unity, namely: $cond(A) = 9.2909$.
+
+\subsubsection{Second example}
+
+A is based on product of Pascal and Hilbert matrices of size 11 in the
+following way:
+
+\begin{algorithmic}
+\STATE $n = 11$
+\STATE $A = hilb(n). * pascal(n)$
+\STATE $A = A-tril(A,-2)-triu(A,2)$
+\STATE $A = A^T * A$
+\end{algorithmic}
+
+Vector b is randolmy generated, but every time the same vector is obtained
+thanks to $randn("state", 0)$ instruction:
+
+\begin{algorithmic}
+\STATE $randn("state", 0)$
+\STATE $b = randn(n, 1)$
+\end{algorithmic}
+
+\[ b = \left(
+\begin{array}{c}
+  -1.2248\e{+00} \\
+   7.6384\e{-01} \\
+  -4.1902\e{-01} \\
+   5.0462\e{-01} \\
+   5.7743\e{-01} \\
+   5.4095\e{-01} \\
+  -6.0212\e{-01} \\
+  -4.2490\e{-02} \\
+   1.8388\e{-01} \\
+  -6.5878\e{-02}
+\end{array} \right)
+\]
+
+Solving for $x$ using Band Cholesky Solver the vector: 
+
+\[ x_{BCS} = \left(
+\begin{array}{c}
+  -5.9584181126\underline{1340}\e{+00} \\
+  +7.5253648228\underline{5158}\e{+00} \\
+  -1.2786997060\underline{7469}\e{-01} \\
+  -2.8406092064\underline{3483}\e{+00} \\
+  +1.5221562124\underline{2016}\e{+00} \\
+  +1.1955147494\underline{0896}\e{-01} \\
+  -5.6776267273\underline{6740}\e{-01} \\
+  +2.8906110676\underline{8170}\e{-01} \\
+  +8.9938809722\underline{0923}\e{-03} \\
+  -9.1118417264\underline{6874}\e{-02} \\
+  +4.7840224822\underline{5803}\e{-02}
+\end{array} \right)
+\]
+
+whereas the vector obtaied by using build-in Octave function $A \backslash b$:
+
+\[ x_{OCT} = \left(
+\begin{array}{c}
+  -5.9584181126\underline{3058}\e{+00} \\
+  +7.5253648228\underline{7429}\e{+00} \\
+  -1.2786997060\underline{0663}\e{-01} \\
+  -2.8406092064\underline{5384}\e{+00} \\
+  +1.5221562124\underline{2985}\e{+00} \\
+  +1.1955147494\underline{1742}\e{-01} \\
+  -5.6776267274\underline{0454}\e{-01} \\
+  +2.8906110677\underline{0057}\e{-01} \\
+  +8.9938809722\underline{6832}\e{-03} \\
+  -9.1118417265\underline{2829}\e{-02} \\
+  +4.7840224822\underline{8929}\e{-02}
+\end{array} \right)
+\]
+   
+Becasuse the relative error is high, i.e $e =  3.59547536244005\e{-12}$
+indicating that some deviations in results can appear even around $11^{th}$
+decimal place this is due to the matrix A being ill-conditioned as condtion
+number of matrix A is high $cond(A) = 1.08771091073209\e{9}$.
+
+\subsubsection{Example no.3}
+
+A is based on inverted magic square of size 9 in the following way:
+
+\begin{algorithmic}
+\STATE $n=9$
+\STATE $A=magic(n)$
+\STATE $A=inv(A)$
+\STATE $A=(A-triu(A,3))-tril(A,-3)$
+\STATE $A=A^T * A$
+\end{algorithmic}
+
+Vector $b$ is randolmy generated, but every time the same vector is obtained
+thanks to $randn("state", 0)$ instruction:
+
+\begin{algorithmic}
+\STATE $randn("state", 0)$
+\STATE $b = randn(n, 1)$
+\end{algorithmic}
+
+\[ b = \left( \begin{array}{c} 
+  -1.2248\e{+00} \\
+   7.6384\e{-01} \\
+  -4.1902\e{-01} \\
+   5.0462\e{-01} \\
+   5.7743\e{-01} \\
+   5.4095\e{-01} \\
+  -6.0212\e{-01} \\
+  -4.2490\e{-02} \\
+   1.8388\e{-01}
+\end{array} \right)
+\]
+
+Solving for x using Band Cholesky Solver, the vector: 
+
+\[ x_{BCS} = \left(
+\begin{array}{c}
+  -8.54210613880\underline{332}\e{+06} \\
+  -3.54982602561\underline{955}\e{+06} \\
+  -2.32076201267\underline{229}\e{+06} \\
+  -2.73885343436\underline{123}\e{+06} \\
+  +2.91011321147\underline{994}\e{+07} \\
+  -6.01576142237\underline{722}\e{+06} \\
+  -6.06596003263\underline{988}\e{+06} \\
+  -3.81886151192\underline{721}\e{+06} \\
+  +1.37176843830\underline{206}\e{+07}
+\end{array} \right)
+\]
+
+Whereas a vector obtaied by using build-in Octave function $A \backslash b$:
+
+\[ x_{OCT} = \left(
+\begin{array}{c}
+%tez tylko 3 zaznaczyc (ww sensie w calym vektorze)
+  -8.54210613880\underline{413}\e{+06} \\ 
+  -3.54982602561\underline{894}\e{+06} \\
+  -2.32076201267\underline{168}\e{+06} \\
+  -2.73885343436\underline{059}\e{+06} \\
+  +2.91011321147\underline{946}\e{+07} \\
+  -6.01576142237\underline{623}\e{+06} \\
+  -6.06596003263\underline{887}\e{+06} \\
+  -3.81886151192\underline{656}\e{+06} \\
+  +1.37176843830\underline{185}\e{+07}
+\end{array} \right)
+\]
+
+Becasuse the relative error is quite significant, i.e $e =
+1.62773786927727\e{-13}$ indicating that some deviations in results can appear 
+even around $12^{th}$ decimal place this is due to the matrix A being 
+ill-conditioned as condtion number of matrix A is quite high $cond(A) = 
+6.17597814680354e+04$.
+
+\subsection{How to use the function in Octave/MATLAB}
+
+Usage of aggregate function $BCS$:
+
+\[ [result\_matrix, error\_vector] = BCS(source\_matrix, parameter\_matrix,
+bandwith\_value) \]
+
+The script $BCS\_menu$ can be used for easier access to the function.
+
+\section{Sources}
+
+\begin{itemize}
+	\item Algorithm 4.3.5, p. 155, G.H.Golub and Ch.F. Van Loan -
+	\emph{Matrix Computations}, Third Edition, The Johns Hopkins University Press,
+	Baltimore and London, 1996
+	\item Article \emph{Forward Substitution}, retrieved: 7th
+	April 2011, available at:
+	\url{https://ece.uwaterloo.ca/~ece204/howtos/forward/} 
+	\item Fortuna, Macukow, Wąsowski - \emph{Metody Numeryczne}
+\end{itemize}
+ 
+\end{document}

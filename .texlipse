@@ -1,0 +1,13 @@
+#TeXlipse project settings
+#Fri Mar 25 14:36:49 CET 2011
+builderNum=2
+outputDir=
+makeIndSty=
+bibrefDir=
+outputFormat=pdf
+tempDir=tmp
+mainTexFile=BandCholeskyMethod.tex
+outputFile=Bysiek,Witan-BandCholeskyMethod.pdf
+langSpell=en
+markDer=true
+srcDir=
